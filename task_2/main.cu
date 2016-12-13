@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <cuda_runtime_api.h>
 
 __global__ void cuda_add(int a, int b, int *result)
@@ -9,19 +8,17 @@ __global__ void cuda_add(int a, int b, int *result)
 
 int main()
 {
-    int a = 2, b = 3;
+    int a, b;
     int h_result, *d_result;
-    cudaError_t err = cudaSuccess;
 
-    err = cudaMalloc((void **)&d_result, sizeof(int));
-    if (err != cudaSuccess)
-        printf("fail\n");
 
+    printf("Pleas, enter two ints\n");
+    scanf("%d%d", &a, &b);
+
+    cudaMalloc((void **)&d_result, sizeof(int));
     cuda_add<<<1, 1>>>(a, b, d_result);
 
-    err = cudaMemcpy(&h_result, d_result, sizeof(int), cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess)
-        printf("fail\n");
+    cudaMemcpy(&h_result, d_result, sizeof(int), cudaMemcpyDeviceToHost);
 
     cudaFree(d_result);
 
