@@ -6,9 +6,8 @@
 
 __global__ void init(BASE_TYPE *a, const int N)
 {
-    int i = threadIdx.x;
-    int j = threadIdx.x;
-    a[j* N + i] = i * N + j;
+    int ind = N * (blockDim.y * blockIdx.y + threadIdx.y) + blockDim.x * blockIdx.x + threadIdx.x;
+    a[ind] = ind;
 }
 
 BASE_TYPE* gen_array(const int N)
