@@ -1,44 +1,33 @@
-/*
- * Copyright 1993-2014 NVIDIA Corporation.  All rights reserved.
- *
- * Please refer to the NVIDIA end user license agreement (EULA) associated
- * with this source code for terms and conditions that govern your use of
- * this software. Any use, reproduction, disclosure, or distribution of
- * this software and related documentation outside the terms of the EULA
- * is strictly prohibited.
- *
- */
-/* This sample queries the properties of the CUDA devices present in the system via CUDA Runtime API. */
-
-// Shared Utilities (QA Testing)
-
-// std::system includes
 #include <memory>
 #include <stdio.h>
 
-// CUDA-C includes
 #include <cuda.h>
 #include <cuda_runtime.h>
-
-// #include <helper_cuda.h>
 
 int main(int argc, char **argv)
 {
     int deviceCount;
     cudaDeviceProp deviceProp;
 
-    //Сколько устройств CUDA установлено на PC.
     cudaGetDeviceCount(&deviceCount);
 
     printf("Device count: %d\n\n", deviceCount);
+    int driverVersion = 0, runtimeVersion = 0;
 
     for (int i = 0; i < deviceCount; i++)
     {
+        cudaSetDevice(i);
         cudaGetDeviceProperties(&deviceProp, i);
+        cudaDeviceProp deviceProp;
+        cudaGetDeviceProperties(&deviceProp, i);
+        cudaDriverGetVersion(&driverVersion);
+        cudaRuntimeGetVersion(&runtimeVersion);
 
         printf("Device name: %s\n", deviceProp.name);
         printf("Total global memory: %d\n", deviceProp.totalGlobalMem);
         printf("Shared memory per block: %d\n", deviceProp.sharedMemPerBlock);
+        printf("  CUDA Driver Version / Runtime Version          %d.%d / %d.%d\n", driverVersion/1000, (driverVersion%100)/10, runtimeVersion/1000, (runtimeVersion%100)/10);
+        printf("  CUDA Capability Major/Minor version number:    %d.%d\n", deviceProp.major, deviceProp.minor);
         printf("Registers per block: %d\n", deviceProp.regsPerBlock);
         printf("Warp size: %d\n", deviceProp.warpSize);
         printf("Memory pitch: %d\n", deviceProp.memPitch);
@@ -65,5 +54,5 @@ int main(int argc, char **argv)
         deviceProp.kernelExecTimeoutEnabled ? "true" : "false");
     }
 
-  return 0;
+    return 0;
 }
