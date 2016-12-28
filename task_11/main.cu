@@ -4,13 +4,21 @@
 
 #define BASE_TYPE float
 
-__global__ void add(const BASE_TYPE *a, BASE_TYPE *a_t, const int N)
+__global__ void mult(const BASE_TYPE *a, const BASE_TYPE *b, BASE_TYPE *c, const int N, const int M)
 {
-    int i = N * (blockDim.y * blockIdx.y + threadIdx.y) + blockDim.x * blockIdx.x + threadIdx.x;
+    int i = N * (blockDim.y * blockIdx.y + threadIdx.y);
+    int j = blockDim.x * blockIdx.x + threadIdx.x;
     
-    int j = N * (blockDim.x * blockIdx.x + threadIdx.x) + blockDim.y * blockIdx.y + threadIdx.y;
+    BASE_TYPE sum = 0;
     
-    a_t[i] = a[j];
+    for (int k = 0; k < N; k++)
+    {
+        sum += a[i + k] * b[k * M + j];
+    }
+    
+    int id = M * (blockDim.y * blockIdx.y + threadIdx.y) + blockDim.x * blockIdx.x + threadIdx.x;
+    
+    c[id] = sum;
 }
 
 BASE_TYPE* gen_array(const int N)
@@ -31,7 +39,7 @@ void print_array(BASE_TYPE *a, const int N)
     for (int i = 0; i < N; i++)
     {
         for (int j = 0; j < N; j++)
-            printf("%3.0f ", a[i *N + j]);
+            printf("%5.0f ", a[i *N + j]);
 
         printf("\n");
     }
@@ -70,14 +78,9 @@ int main()
 
     dim3 threadsPerBlock, blocksPerGrid;
     cuda_init_grid_and_block(&blocksPerGrid, &threadsPerBlock, N);
-    cudaEvent_t start, stop;
-    float h2d_cp_span, d2h_cp_span, k_span;
-    
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
 
-    BASE_TYPE *host_a = gen_array(N);
-    BASE_TYPE *dev_a, *dev_b;
+    BASE_TYPE *host_a = gen_array(N), *host_b = gen_array(N);
+    BASE_TYPE *dev_a, *dev_b, *dev_c;
 
     if (host_a == NULL)
     {
@@ -86,13 +89,13 @@ int main()
     }
 
     print_array(host_a, N);
-
-    cudaEventRecord(start, 0);
+    print_array(host_b, N);
 
     try
     {
         cuda_init_array(&dev_a, host_a, size);
-        cuda_init_array(&dev_b, NULL, size);
+        cuda_init_array(&dev_b, host_b, size);
+        cuda_init_array(&dev_c, NULL, size);
     }
     catch (cudaError_t err)
     {
@@ -100,31 +103,14 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&h2d_cp_span, start, stop);
+    mult<<<blocksPerGrid, threadsPerBlock>>>(dev_a, dev_b, dev_c, N, N);
 
-    add<<<blocksPerGrid, threadsPerBlock>>>(dev_a, dev_b, N);
-
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&k_span, start, stop);
-
-
-    err = cudaMemcpy(host_a, dev_b, size, cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(host_a, dev_c, size, cudaMemcpyDeviceToHost);
     if (err != cudaSuccess)
     {
         fprintf(stderr, "Failed to allocate device (error code: %s)!\n", cudaGetErrorString(err));
         exit(EXIT_FAILURE);
     }
-
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&d2h_cp_span, start, stop);
-
-    printf("Copy form host to device time: %.2f milliseconds\n", h2d_cp_span);
-    printf("Run kernel time: %.2f milliseconds\n", k_span);
-    printf("Copy form device to host time: %.2f milliseconds\n", d2h_cp_span);
 
     print_array(host_a, N);
 

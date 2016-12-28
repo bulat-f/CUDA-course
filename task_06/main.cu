@@ -105,7 +105,8 @@ int main()
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&h2d_cp_span, start, stop);
 
-    add<<<blocksPerGrid, threadsPerBlock>>>(dev_a, dev_b, dev_c, N);
+    for(int i = 0; i < 100; i++)
+        add<<<blocksPerGrid, threadsPerBlock>>>(dev_a, dev_b, dev_c, N);
 
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
@@ -117,9 +118,9 @@ int main()
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&d2h_cp_span, start, stop);
 
-    printf("Copy form host to device time: %.2f milliseconds\n", h2d_cp_span);
-    printf("Run kernel time: %.2f milliseconds\n", k_span);
-    printf("Copy form device to host time: %.2f milliseconds\n", d2h_cp_span);
+    // printf("Copy form host to device time: %.2f milliseconds\n", h2d_cp_span);
+    printf("Run kernel time: %.2f milliseconds\n", (k_span - h2d_cp_span) / 100);
+    // printf("Copy form device to host time: %.2f milliseconds\n", d2h_cp_span);
 
     cudaFree(dev_a);
     cudaFree(dev_b);
