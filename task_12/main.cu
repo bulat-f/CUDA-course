@@ -4,7 +4,7 @@
 
 #define BASE_TYPE float
 
-__global__ void dot(const BASE_TYPE *a, const BASE_TYPE *b, BASE_TYPE *result, const int N)
+__global__ void dot_produce(const BASE_TYPE *a, const BASE_TYPE *b, BASE_TYPE *result, const int N)
 {
     extern __shared__ BASE_TYPE s[];
 
@@ -14,11 +14,9 @@ __global__ void dot(const BASE_TYPE *a, const BASE_TYPE *b, BASE_TYPE *result, c
     __syncthreads();
     
     if (threadIdx.x == 0) {
-        BASE_TYPE sum = 0;
-
-        for (int i = 0; i < blockDim.x; i++)
-            sum += s[i];
-        result[blockIdx.x] = sum;
+        for (int i = 1; i < blockDim.x; i++)
+            s[0] += s[i];
+        result[blockIdx.x] = s[0];
     }
 }
 
@@ -37,7 +35,7 @@ BASE_TYPE* gen_array(const int N)
 void print_vector(BASE_TYPE *a, const int N)
 {
     for (int i = 0; i < N; i++)
-        printf("%5.0f ", a[i]);
+        printf("%3.0f ", a[i]);
 
     printf("\n");
 }
@@ -65,8 +63,9 @@ void cuda_init_grid_and_block(dim3 *grid, dim3 *block, const int threadsPerBlock
     printf("Grid %d %d %d\n", grid->x, grid->y, grid->z);
 }
 
-BASE_TYPE dot_produce(const BASE_TYPE *host_a, const BASE_TYPE *host_b, const int N)
+int main()
 {
+    const int N = 10;
     const int threadsPerBlock = N;
     const size_t size = N * sizeof(BASE_TYPE);
     const size_t result_size = size / threadsPerBlock;
@@ -75,15 +74,18 @@ BASE_TYPE dot_produce(const BASE_TYPE *host_a, const BASE_TYPE *host_b, const in
     dim3 blockDim, gridDim;
     cuda_init_grid_and_block(&blockDim, &gridDim, threadsPerBlock, N);
 
-    BASE_TYPE *host_c = new BASE_TYPE[result_size / sizeof(BASE_TYPE)];
+    BASE_TYPE *host_a = gen_array(N), *host_b = gen_array(N);
     BASE_TYPE *dev_a, *dev_b, *dev_c;
-    BASE_TYPE result = 0;
+    BASE_TYPE result;
+
+    print_vector(host_a, N);
+    print_vector(host_b, N);
 
     try
     {
         cuda_init_array(&dev_a, host_a, size);
         cuda_init_array(&dev_b, host_b, size);
-        cuda_init_array(&dev_c, NULL, result_size);
+        cuda_init_array(&dev_c, NULL, sizeof(BASE_TYPE));
     }
     catch (cudaError_t err)
     {
@@ -91,37 +93,20 @@ BASE_TYPE dot_produce(const BASE_TYPE *host_a, const BASE_TYPE *host_b, const in
         exit(EXIT_FAILURE);
     }
 
-    dot<<<blockDim, gridDim, threadsPerBlock * sizeof(BASE_TYPE)>>>(dev_a, dev_b, dev_c, N);
+    dot_produce<<<blockDim, gridDim, threadsPerBlock * sizeof(BASE_TYPE)>>>(dev_a, dev_b, dev_c, N);
 
-    err = cudaMemcpy(host_c, dev_c, result_size, cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(&result, dev_c, result_size, cudaMemcpyDeviceToHost);
     if (err != cudaSuccess)
     {
         fprintf(stderr, "Failed to allocate device (error code: %s)!\n", cudaGetErrorString(err));
         exit(EXIT_FAILURE);
     }
 
+    printf("%4.2f\n", result);
+
     cudaFree(dev_a);
     cudaFree(dev_b);
     cudaFree(dev_c);
-
-    for (int i = 0; i < result_size / sizeof(BASE_TYPE); i++)
-        result += host_c[i];
-
-    delete[] host_c;
-    return result;
-}
-
-int main()
-{
-    const int N = 10;
-    
-    BASE_TYPE *host_a = gen_array(N), *host_b = gen_array(N);
-    BASE_TYPE produce = dot_produce(host_a, host_b, N);
-
-    print_vector(host_a, N);
-    print_vector(host_b, N);
-
-    printf("%f\n", produce);;
 
     delete[] host_a;
     delete[] host_b;
